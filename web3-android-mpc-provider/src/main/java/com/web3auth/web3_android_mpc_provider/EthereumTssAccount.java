@@ -43,7 +43,14 @@ public class EthereumTssAccount {
 
     public EthereumTssAccount(EthTssAccountParams params) {
         ethAccountParams = params;
-        evmAddress = Keys.toChecksumAddress(Keys.getAddress(params.publicKey));
+        String prefix = "04";
+        String key;
+        if (params.publicKey.startsWith(prefix)) {
+            key = params.publicKey.substring(prefix.length());
+        } else {
+            key = params.publicKey;
+        }
+        evmAddress = Keys.toChecksumAddress(Keys.getAddress(key));
     }
 
     public String signMessage(String message) throws TSSClientError, CustomSigningError {
