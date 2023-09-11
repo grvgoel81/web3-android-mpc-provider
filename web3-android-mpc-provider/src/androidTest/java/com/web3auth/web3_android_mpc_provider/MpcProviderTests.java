@@ -4,10 +4,14 @@ import static org.junit.Assert.assertNotNull;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.web3auth.tss_client_android.client.TSSClientError;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.io.IOException;
 import java.math.BigInteger;
+import java.util.concurrent.ExecutionException;
 
 @RunWith(AndroidJUnit4.class)
 public class MpcProviderTests {
@@ -42,7 +46,7 @@ public class MpcProviderTests {
     BigInteger[] nodeIndexs = {new BigInteger("1"), new BigInteger("2"), new BigInteger("3")};
 
     @Test
-    public void testSigningMessage() {
+    public void testSigningMessage() throws TSSClientError, CustomSigningError {
         EthTssAccountParams params = new EthTssAccountParams(
                 fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
                 nodeIndexs, tssEndpoints, sigs);
@@ -55,19 +59,13 @@ public class MpcProviderTests {
     }
 
     @Test
-    public void testSigningTransaction() {
+    public void testSigningTransaction() throws TSSClientError, CustomSigningError, IOException, ExecutionException, InterruptedException {
         EthTssAccountParams params = new EthTssAccountParams(
                 fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
                 nodeIndexs, tssEndpoints, sigs);
-
         EthereumTssAccount account = new EthereumTssAccount(params);
-
-        String fromAddress = Utils.generateAddressFromPubKey(params.getPublicKey());
-        System.out.println("fromAddress: " + fromAddress);
-        String toAddress = "0x048975d4997D7578A3419851639c10318db430b6"; //Utils.generateAddressFromPubKey(params.getPublicKey());
-        String transactionHash = account.signAndSendTransaction("https://rpc.ankr.com/eth_goerli", 0.001,
-                fromAddress, toAddress);
-        System.out.println("Transaction Hash: " + transactionHash);
+        String toAddress = "0x048975d4997D7578A3419851639c10318db430b6";
+        String transactionHash = account.signAndSendTransaction("https://rpc.ankr.com/eth_goerli", 0.001, toAddress);
         assertNotNull(transactionHash);
     }
 

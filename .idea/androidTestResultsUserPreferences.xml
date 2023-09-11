@@ -10,6 +10,7 @@
                 <map>
                   <entry key="Duration" value="90" />
                   <entry key="Pixel_3a_API_30" value="120" />
+                  <entry key="Pixel_3a_API_32_arm64-v8a" value="120" />
                   <entry key="Tests" value="360" />
                 </map>
               </option>
@@ -37,6 +38,7 @@
                   <entry key="4donobgezlss7dv4" value="120" />
                   <entry key="Duration" value="90" />
                   <entry key="Pixel_3a_API_30" value="120" />
+                  <entry key="Pixel_3a_API_32_arm64-v8a" value="120" />
                   <entry key="Tests" value="360" />
                   <entry key="Xiaomi&#10; M2103K19I" value="120" />
                 </map>
