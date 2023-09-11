@@ -5,6 +5,8 @@ import static org.web3j.utils.Numeric.hexStringToByteArray;
 import android.util.Base64;
 import android.util.Pair;
 
+import androidx.annotation.Nullable;
+
 import com.web3auth.tss_client_android.client.EndpointsData;
 import com.web3auth.tss_client_android.client.TSSClient;
 import com.web3auth.tss_client_android.client.TSSClientError;
@@ -19,12 +21,7 @@ import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.Sign;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameterName;
-import org.web3j.protocol.core.methods.response.EthChainId;
-import org.web3j.protocol.core.methods.response.EthGasPrice;
-import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
-import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
 
@@ -34,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 public class EthereumTssAccount {
 
@@ -63,30 +59,28 @@ public class EthereumTssAccount {
         return TSSHelpers.hexSignature(signatureResult.getFirst(), signatureResult.getSecond(), v);
     }
 
-    public String signAndSendTransaction(String url, Double amount, String toAddress) throws TSSClientError, CustomSigningError, IOException, ExecutionException, InterruptedException {
-        //setup Web3j
-        Web3j web3j = Web3j.build(new HttpService(url));
-        EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
-                evmAddress,
-                DefaultBlockParameterName.LATEST
-        ).send();
-        BigInteger nonce = ethGetTransactionCount.getTransactionCount();
+    //todo: Method for signing eip712 structured data
+
+    //todo Method for signing eip1559 transactions, note that v follows a formula here and is not just modified with 27
+
+    public String signTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit, BigInteger maxPriorityFeePerGas, BigInteger maxFeePerGas) throws TSSClientError, CustomSigningError {
         BigInteger value = Convert.toWei(Double.toString(amount), Convert.Unit.ETHER).toBigInteger();
-        BigInteger gasLimit = BigInteger.valueOf(21000);
-        EthGasPrice gasPriceResponse = web3j.ethGasPrice().send();
-        BigInteger gasPrice = gasPriceResponse.getGasPrice();
-        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
-        BigInteger chainId = chainIdResponse.getChainId();
+
+        // todo: this appears to be a bug in web3j, if data is null it throws but is marked as nullable
+        String txData = "";
+        if (data != null) {
+            txData = data;
+        }
 
         RawTransaction rawTransaction = RawTransaction.createTransaction(
-                chainId.longValue(),
+                chainID.longValue(),
                 nonce,
                 gasLimit,
                 toAddress,
                 value,
-                "",
-                gasPrice,
-                gasPrice
+                txData,
+                maxPriorityFeePerGas,
+                maxFeePerGas
         );
 
         byte[] encodedTransaction = TransactionEncoder.encode(rawTransaction);
@@ -99,14 +93,13 @@ public class EthereumTssAccount {
                 signatureResult.getFirst().toByteArray());
         byte[] signedMsg = TransactionEncoder.encode(rawTransaction, signatureData);
 
-        String finalSig = Numeric.toHexString(signedMsg);
+       return Numeric.toHexString(signedMsg);
+    }
 
-        EthSendTransaction ethSendTransaction = web3j.ethSendRawTransaction(finalSig).send();
-
+    public void sendTransaction(Web3j web3j, String signedTx) throws IOException, CustomSigningError {
+        EthSendTransaction ethSendTransaction = web3j.ethSendRawTransaction(signedTx).send();
         if (ethSendTransaction.getError() != null) {
             throw new CustomSigningError(ethSendTransaction.getError().getMessage());
-        } else {
-            return ethSendTransaction.getTransactionHash();
         }
     }
 

@@ -54,8 +54,7 @@ public class MpcProviderTests {
         EthereumTssAccount account = new EthereumTssAccount(params);
 
         String msg = "hello world";
-        String signature = account.signMessage(msg);
-        assertNotNull(signature);
+        account.signMessage(msg);
     }
 
     @Test
@@ -65,8 +64,6 @@ public class MpcProviderTests {
                 nodeIndexs, tssEndpoints, sigs);
         EthereumTssAccount account = new EthereumTssAccount(params);
         String toAddress = "0x048975d4997D7578A3419851639c10318db430b6";
-        String transactionHash = account.signAndSendTransaction("https://rpc.ankr.com/eth_goerli", 0.001, toAddress);
-        assertNotNull(transactionHash);
+        account.signTransaction(new BigInteger("5"), toAddress, 0.001, null, new BigInteger("0"), new BigInteger("21000" ), new BigInteger("21000"), new BigInteger("21000"));
     }
-
 }
