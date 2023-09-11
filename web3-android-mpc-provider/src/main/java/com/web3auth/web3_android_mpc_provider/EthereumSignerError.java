@@ -1,7 +1,7 @@
 package com.web3auth.web3_android_mpc_provider;
 
 public class EthereumSignerError extends Error {
-    private ErrorType errorType;
+    private final ErrorType errorType;
 
     public EthereumSignerError(ErrorType errorType) {
         this.errorType = errorType;
@@ -11,7 +11,7 @@ public class EthereumSignerError extends Error {
         switch (errorType) {
             case EMPTY_RAW_TRANSACTION:
                 return "emptyRawTransaction";
-            case INSUFFICIENT_Funds:
+            case INSUFFICIENT_FUNDS:
                 return "insufficientFunds";
             case UNKNOWN_ERROR:
                 return "unknownError";
@@ -22,7 +22,7 @@ public class EthereumSignerError extends Error {
 
     public enum ErrorType {
         EMPTY_RAW_TRANSACTION,
-        INSUFFICIENT_Funds,
+        INSUFFICIENT_FUNDS,
         UNKNOWN_ERROR
     }
 }
