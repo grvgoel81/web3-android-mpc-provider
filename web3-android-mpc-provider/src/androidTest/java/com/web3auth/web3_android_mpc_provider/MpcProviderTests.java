@@ -7,15 +7,10 @@ import com.web3auth.tss_client_android.client.TSSClientError;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameterName;
-import org.web3j.protocol.core.methods.response.EthChainId;
-import org.web3j.protocol.core.methods.response.EthGasPrice;
-import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.http.HttpService;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.SignatureException;
 import java.util.concurrent.ExecutionException;
 
 @RunWith(AndroidJUnit4.class)
@@ -74,7 +69,7 @@ public class MpcProviderTests {
     }
 
     @Test
-    public void testSigningLegacyTransaction() throws TSSClientError, CustomSigningError, ExecutionException, InterruptedException, IOException {
+    public void testSigningLegacyTransaction() throws TSSClientError, CustomSigningError, ExecutionException, InterruptedException {
         EthTssAccountParams params = new EthTssAccountParams(
                 fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
                 nodeIndexs, tssEndpoints, sigs);
@@ -82,21 +77,13 @@ public class MpcProviderTests {
         // setup Web3j
         String url = "https://rpc.ankr.com/eth_goerli";
         Web3j web3j = Web3j.build(new HttpService(url));
-        EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
-                account.evmAddress,
-                DefaultBlockParameterName.LATEST
-        ).send();
-        BigInteger nonce = ethGetTransactionCount.getTransactionCount();
         BigInteger gasLimit = BigInteger.valueOf(21000);
-        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
-        BigInteger chainId = chainIdResponse.getChainId();
-
         String toAddress = "0xE09543f1974732F5D6ad442dDf176D9FA54a5Be0";
-        account.signLegacyTransaction(chainId, toAddress, 0.001, null, nonce, gasLimit);
+        account.signLegacyTransaction(web3j, toAddress, 0.001, null, gasLimit);
     }
 
     @Test
-    public void testSigningTransaction() throws TSSClientError, CustomSigningError, SignatureException, ExecutionException, InterruptedException, IOException {
+    public void testSigningTransaction() throws TSSClientError, CustomSigningError, ExecutionException, InterruptedException, IOException {
         EthTssAccountParams params = new EthTssAccountParams(
                 fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
                 nodeIndexs, tssEndpoints, sigs);
@@ -104,18 +91,9 @@ public class MpcProviderTests {
         // setup Web3j
         String url = "https://rpc.ankr.com/eth_goerli";
         Web3j web3j = Web3j.build(new HttpService(url));
-        EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
-                account.evmAddress,
-                DefaultBlockParameterName.LATEST
-        ).send();
-        BigInteger nonce = ethGetTransactionCount.getTransactionCount();
         BigInteger gasLimit = BigInteger.valueOf(21000);
-        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
-        BigInteger chainId = chainIdResponse.getChainId();
-        EthGasPrice gasPriceResponse = web3j.ethGasPrice().send();
-        BigInteger gasPrice = gasPriceResponse.getGasPrice();
 
         String toAddress = "0xE09543f1974732F5D6ad442dDf176D9FA54a5Be0";
-        account.signTransaction(chainId, toAddress, 0.001, null, nonce, gasLimit, gasPrice, gasPrice);
+        account.signTransaction(web3j, toAddress, 0.001, 0.001, null, gasLimit);
     }
 }

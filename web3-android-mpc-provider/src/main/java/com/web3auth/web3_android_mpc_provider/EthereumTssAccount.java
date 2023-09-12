@@ -22,17 +22,20 @@ import org.web3j.crypto.Sign;
 import org.web3j.crypto.StructuredDataEncoder;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.methods.response.EthSendTransaction;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.response.EthChainId;
+import org.web3j.protocol.core.methods.response.EthGasPrice;
+import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 public class EthereumTssAccount {
 
@@ -74,7 +77,12 @@ public class EthereumTssAccount {
     }
 
 
-    public String signLegacyTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit) throws TSSClientError, CustomSigningError {
+    public String signLegacyTransaction(Web3j web3j, String toAddress, Double amount, @Nullable String data, BigInteger gasLimit) throws TSSClientError, CustomSigningError, ExecutionException, InterruptedException {
+        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
+        BigInteger chainId = chainIdResponse.getChainId();
+        EthGetTransactionCount countResponse = web3j.ethGetTransactionCount(
+                evmAddress, DefaultBlockParameterName.LATEST).sendAsync().get();
+        BigInteger nonce = countResponse.getTransactionCount();
         BigInteger value = Convert.toWei(Double.toString(amount), Convert.Unit.ETHER).toBigInteger();
 
         String txData = "";
@@ -83,7 +91,7 @@ public class EthereumTssAccount {
         }
 
         RawTransaction rawTransaction = RawTransaction.createTransaction(
-                chainID,
+                chainId,
                 nonce,
                 gasLimit,
                 toAddress,
@@ -110,8 +118,19 @@ public class EthereumTssAccount {
         return Numeric.toHexString(signedTransaction);
     }
 
-    public String signTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit, BigInteger maxPriorityFeePerGas, BigInteger maxFeePerGas) throws TSSClientError, CustomSigningError, SignatureException {
+    public String signTransaction(Web3j web3j, String toAddress, Double amount, Double minerTip, @Nullable String data, BigInteger gasLimit) throws TSSClientError, CustomSigningError, ExecutionException, InterruptedException, IOException {
+        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
+        BigInteger chainId = chainIdResponse.getChainId();
+        EthGetTransactionCount countResponse = web3j.ethGetTransactionCount(
+                evmAddress, DefaultBlockParameterName.LATEST).sendAsync().get();
+        BigInteger nonce = countResponse.getTransactionCount();
+        EthGasPrice gasPriceResponse = web3j.ethGasPrice().send();
+        BigInteger gasPrice = gasPriceResponse.getGasPrice();
+
         BigInteger value = Convert.toWei(Double.toString(amount), Convert.Unit.ETHER).toBigInteger();
+        BigInteger maxPriorityFeePerGas = Convert.toWei(Double.toString(minerTip), Convert.Unit.ETHER).toBigInteger();
+
+        BigInteger maxFeePerGas = gasPrice.add(maxPriorityFeePerGas);
 
         String txData = "";
         if (data != null) {
@@ -119,7 +138,7 @@ public class EthereumTssAccount {
         }
 
         RawTransaction rawTransaction = RawTransaction.createTransaction(
-                chainID.longValue(),
+                chainId.longValue(),
                 nonce,
                 gasLimit,
                 toAddress,
@@ -136,7 +155,7 @@ public class EthereumTssAccount {
 
         Byte v = signatureResult.getThird();
         if (v < 35) {
-            v = (byte) ((chainID.byteValue() * 2) + (v + 35));
+            v = (byte) ((chainId.byteValue() * 2) + (v + 35));
         }
 
         Sign.SignatureData signatureData = new Sign.SignatureData(v,
@@ -146,13 +165,6 @@ public class EthereumTssAccount {
         byte[] signedTransaction = TransactionEncoder.encode(rawTransaction, signatureData);
 
         return Numeric.toHexString(signedTransaction);
-    }
-
-    public void sendTransaction(Web3j web3j, String signedTx) throws IOException, CustomSigningError {
-        EthSendTransaction ethSendTransaction = web3j.ethSendRawTransaction(signedTx).send();
-        if (ethSendTransaction.getError() != null) {
-            throw new CustomSigningError(ethSendTransaction.getError().getMessage());
-        }
     }
 
     private Triple<BigInteger, BigInteger, Byte> sign(String hash) throws TSSClientError, CustomSigningError {
