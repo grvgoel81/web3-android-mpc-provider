@@ -77,7 +77,6 @@ public class EthereumTssAccount {
     public String signLegacyTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit) throws TSSClientError, CustomSigningError {
         BigInteger value = Convert.toWei(Double.toString(amount), Convert.Unit.ETHER).toBigInteger();
 
-        // todo: this appears to be a bug in web3j, if data is null it throws but is marked as nullable
         String txData = "";
         if (data != null) {
             txData = data;
@@ -99,7 +98,7 @@ public class EthereumTssAccount {
 
         Byte v = signatureResult.getThird();
         if (v < 27) {
-            v = (byte) ((chainID.byteValue() * 2) + (v + 35));
+            v = (byte) (v + 27);
         }
 
         Sign.SignatureData signatureData = new Sign.SignatureData(v,
@@ -136,7 +135,7 @@ public class EthereumTssAccount {
         Triple<BigInteger, BigInteger, Byte> signatureResult = sign(encodedTransactionString);
 
         Byte v = signatureResult.getThird();
-        if (v < 27) {
+        if (v < 35) {
             v = (byte) ((chainID.byteValue() * 2) + (v + 35));
         }
 
