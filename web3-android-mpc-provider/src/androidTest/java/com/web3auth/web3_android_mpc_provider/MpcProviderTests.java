@@ -1,16 +1,21 @@
 package com.web3auth.web3_android_mpc_provider;
 
-import static org.junit.Assert.assertNotNull;
-
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.web3auth.tss_client_android.client.TSSClientError;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.response.EthChainId;
+import org.web3j.protocol.core.methods.response.EthGasPrice;
+import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
+import org.web3j.protocol.http.HttpService;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.SignatureException;
 import java.util.concurrent.ExecutionException;
 
 @RunWith(AndroidJUnit4.class)
@@ -20,7 +25,7 @@ public class MpcProviderTests {
         System.loadLibrary("dkls-native");
     }
 
-    final String example1 = "{\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"version\",\"type\":\"string\"},{\"name\":\"chainId\",\"type\":\"uint256\"},{\"name\":\"verifyingContract\",\"type\":\"address\"}],\"Person\":[{\"name\":\"name\",\"type\":\"string\"},{{\"name\":\"wallet\",\"type\":\"address\"}]],\"Mail\":[{\"name\":\"from\",\"type\":\"Person\"},{\"name\":\"to\",\"type\":\"Person\"},{\"name\":\"contents\",\"type\":\"string\"}]},\"primaryType\":\"Mail\",\"domain\":{\"name\":\"Ether Mail\",\"version\":\"1\",\"chainId\":1,\"verifyingContract\":\"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC\"},\"message\":{\"from\":{\"name\":\"Account\",\"wallet\":\"0x048975d4997d7578a3419851639c10318db430b6\"},\"to\":{\"name\":\"Bob\",\"wallet\":\"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB\"},\"contents\":\"Hello, Bob!\"}}";
+    final String example1 = "{\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"version\",\"type\":\"string\"},{\"name\":\"chainId\",\"type\":\"uint256\"},{\"name\":\"verifyingContract\",\"type\":\"address\"}],\"Person\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"wallet\",\"type\":\"address\"}],\"Mail\":[{\"name\":\"from\",\"type\":\"Person\"},{\"name\":\"to\",\"type\":\"Person\"},{\"name\":\"contents\",\"type\":\"string\"}]},\"primaryType\":\"Mail\",\"domain\":{\"name\":\"Ether Mail\",\"version\":\"1\",\"chainId\":1,\"verifyingContract\":\"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC\"},\"message\":{\"from\":{\"name\":\"Account\",\"wallet\":\"0x048975d4997d7578a3419851639c10318db430b6\"},\"to\":{\"name\":\"Bob\",\"wallet\":\"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB\"},\"contents\":\"Hello,Bob!\"}}";
 
     final String fullAddress = "04238569d5e12caf57d34fb5b2a0679c7775b5f61fd18cd69db9cc600a651749c3ec13a9367380b7a024a67f5e663f3afd40175c3223da63f6024b05d0bd9f292e";
     final String factorKey = "3b4af35bc4838471f94825f34c4f649904a258c0907d348bed653eb0c94ec6c0";
@@ -58,12 +63,59 @@ public class MpcProviderTests {
     }
 
     @Test
-    public void testSigningTransaction() throws TSSClientError, CustomSigningError, IOException, ExecutionException, InterruptedException {
+    public void testSignTypedData() throws TSSClientError, IOException, CustomSigningError {
+        EthTssAccountParams params = new EthTssAccountParams(
+                fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
+                nodeIndexs, tssEndpoints, sigs);
+
+        EthereumTssAccount account = new EthereumTssAccount(params);
+
+        account.signTypedData(example1);
+    }
+
+    @Test
+    public void testSigningLegacyTransaction() throws TSSClientError, CustomSigningError, ExecutionException, InterruptedException, IOException {
         EthTssAccountParams params = new EthTssAccountParams(
                 fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
                 nodeIndexs, tssEndpoints, sigs);
         EthereumTssAccount account = new EthereumTssAccount(params);
-        String toAddress = "0x048975d4997D7578A3419851639c10318db430b6";
-        account.signTransaction(new BigInteger("5"), toAddress, 0.001, null, new BigInteger("0"), new BigInteger("21000" ), new BigInteger("21000"), new BigInteger("21000"));
+        // setup Web3j
+        String url = "https://rpc.ankr.com/eth_goerli";
+        Web3j web3j = Web3j.build(new HttpService(url));
+        EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
+                account.evmAddress,
+                DefaultBlockParameterName.LATEST
+        ).send();
+        BigInteger nonce = ethGetTransactionCount.getTransactionCount();
+        BigInteger gasLimit = BigInteger.valueOf(21000);
+        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
+        BigInteger chainId = chainIdResponse.getChainId();
+
+        String toAddress = "0xE09543f1974732F5D6ad442dDf176D9FA54a5Be0";
+        account.signLegacyTransaction(chainId, toAddress, 0.001, null, nonce, gasLimit);
+    }
+
+    @Test
+    public void testSigningTransaction() throws TSSClientError, CustomSigningError, SignatureException, ExecutionException, InterruptedException, IOException {
+        EthTssAccountParams params = new EthTssAccountParams(
+                fullAddress, factorKey, tssNonce, tssShare, tssIndex, selected_tag, verifier, verifierId,
+                nodeIndexs, tssEndpoints, sigs);
+        EthereumTssAccount account = new EthereumTssAccount(params);
+        // setup Web3j
+        String url = "https://rpc.ankr.com/eth_goerli";
+        Web3j web3j = Web3j.build(new HttpService(url));
+        EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
+                account.evmAddress,
+                DefaultBlockParameterName.LATEST
+        ).send();
+        BigInteger nonce = ethGetTransactionCount.getTransactionCount();
+        BigInteger gasLimit = BigInteger.valueOf(21000);
+        EthChainId chainIdResponse = web3j.ethChainId().sendAsync().get();
+        BigInteger chainId = chainIdResponse.getChainId();
+        EthGasPrice gasPriceResponse = web3j.ethGasPrice().send();
+        BigInteger gasPrice = gasPriceResponse.getGasPrice();
+
+        String toAddress = "0xE09543f1974732F5D6ad442dDf176D9FA54a5Be0";
+        account.signTransaction(chainId, toAddress, 0.001, null, nonce, gasLimit, gasPrice, gasPrice);
     }
 }

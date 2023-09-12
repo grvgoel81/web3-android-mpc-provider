@@ -19,6 +19,7 @@ import org.web3j.crypto.Hash;
 import org.web3j.crypto.Keys;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.Sign;
+import org.web3j.crypto.StructuredDataEncoder;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
@@ -27,6 +28,7 @@ import org.web3j.utils.Numeric;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -59,14 +61,58 @@ public class EthereumTssAccount {
         return TSSHelpers.hexSignature(signatureResult.getFirst(), signatureResult.getSecond(), v);
     }
 
-    //todo: Method for signing eip712 structured data
+    public String signTypedData(String jsonData) throws IOException, TSSClientError, CustomSigningError {
+        StructuredDataEncoder dataEncoder = new StructuredDataEncoder(jsonData);
+        byte[] hashStructuredData = dataEncoder.hashStructuredData();
+        String structuredData = android.util.Base64.encodeToString(hashStructuredData, Base64.NO_WRAP);
+        Triple<BigInteger, BigInteger, Byte> signatureResult = sign(structuredData);
+        Byte v = signatureResult.getThird();
+        if (v < 27) {
+            v = (byte) (v + 27);
+        }
+        return TSSHelpers.hexSignature(signatureResult.getFirst(), signatureResult.getSecond(), v);
+    }
 
-    //todo Method for signing eip1559 transactions, note that v follows a formula here and is not just modified with 27
 
-    public String signTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit, BigInteger maxPriorityFeePerGas, BigInteger maxFeePerGas) throws TSSClientError, CustomSigningError {
+    public String signLegacyTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit) throws TSSClientError, CustomSigningError {
         BigInteger value = Convert.toWei(Double.toString(amount), Convert.Unit.ETHER).toBigInteger();
 
-        // todo: this appears to be a bug in web3j, if data is null it throws but is marked as nullable
+        String txData = "";
+        if (data != null) {
+            txData = data;
+        }
+
+        RawTransaction rawTransaction = RawTransaction.createTransaction(
+                chainID,
+                nonce,
+                gasLimit,
+                toAddress,
+                value,
+                txData
+        );
+
+        byte[] encodedTransaction = TransactionEncoder.encode(rawTransaction);
+        String encodedTransactionString = Base64.encodeToString(Hash.sha3(encodedTransaction), Base64.NO_WRAP);
+
+        Triple<BigInteger, BigInteger, Byte> signatureResult = sign(encodedTransactionString);
+
+        Byte v = signatureResult.getThird();
+        if (v < 27) {
+            v = (byte) (v + 27);
+        }
+
+        Sign.SignatureData signatureData = new Sign.SignatureData(v,
+                signatureResult.getSecond().toByteArray(),
+                signatureResult.getFirst().toByteArray());
+
+        byte[] signedTransaction = TransactionEncoder.encode(rawTransaction, signatureData);
+
+        return Numeric.toHexString(signedTransaction);
+    }
+
+    public String signTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit, BigInteger maxPriorityFeePerGas, BigInteger maxFeePerGas) throws TSSClientError, CustomSigningError, SignatureException {
+        BigInteger value = Convert.toWei(Double.toString(amount), Convert.Unit.ETHER).toBigInteger();
+
         String txData = "";
         if (data != null) {
             txData = data;
@@ -88,12 +134,18 @@ public class EthereumTssAccount {
 
         Triple<BigInteger, BigInteger, Byte> signatureResult = sign(encodedTransactionString);
 
-        Sign.SignatureData signatureData = new Sign.SignatureData((byte) (signatureResult.getThird() + 27),
+        Byte v = signatureResult.getThird();
+        if (v < 35) {
+            v = (byte) ((chainID.byteValue() * 2) + (v + 35));
+        }
+
+        Sign.SignatureData signatureData = new Sign.SignatureData(v,
                 signatureResult.getSecond().toByteArray(),
                 signatureResult.getFirst().toByteArray());
-        byte[] signedMsg = TransactionEncoder.encode(rawTransaction, signatureData);
 
-       return Numeric.toHexString(signedMsg);
+        byte[] signedTransaction = TransactionEncoder.encode(rawTransaction, signatureData);
+
+        return Numeric.toHexString(signedTransaction);
     }
 
     public void sendTransaction(Web3j web3j, String signedTx) throws IOException, CustomSigningError {
@@ -175,6 +227,7 @@ public class EthereumTssAccount {
 
         return new Pair<>(client, coeffs);
     }
+
 
     private EndpointsData generateEndpoints(int parties, int clientIndex, List<String> tssEndpoints) {
         List<String> endpoints = new ArrayList<>();
