@@ -105,9 +105,9 @@ public class EthereumTssAccount {
                 signatureResult.getSecond().toByteArray(),
                 signatureResult.getFirst().toByteArray());
 
-        byte[] signedMsg = TransactionEncoder.encode(rawTransaction, signatureData);
+        byte[] signedTransaction = TransactionEncoder.encode(rawTransaction, signatureData);
 
-        return Numeric.toHexString(signedMsg);
+        return Numeric.toHexString(signedTransaction);
     }
 
     public String signTransaction(BigInteger chainID, String toAddress, Double amount, @Nullable String data, BigInteger nonce, BigInteger gasLimit, BigInteger maxPriorityFeePerGas, BigInteger maxFeePerGas) throws TSSClientError, CustomSigningError, SignatureException {
@@ -143,9 +143,9 @@ public class EthereumTssAccount {
                 signatureResult.getSecond().toByteArray(),
                 signatureResult.getFirst().toByteArray());
 
-        byte[] signedMsg = TransactionEncoder.encode(rawTransaction, signatureData);
+        byte[] signedTransaction = TransactionEncoder.encode(rawTransaction, signatureData);
 
-        return Numeric.toHexString(signedMsg);
+        return Numeric.toHexString(signedTransaction);
     }
 
     public void sendTransaction(Web3j web3j, String signedTx) throws IOException, CustomSigningError {
